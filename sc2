@@ -1,0 +1,159 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local tweenService = game:GetService("TweenService")
+local runService = game:GetService("RunService")
+
+local function createStyledButton(parent, text, position)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0.2, 0)
+    button.Position = position
+    button.Text = text
+    button.TextScaled = true
+    button.Font = Enum.Font.SourceSansSemibold
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
+    button.BackgroundTransparency = 0.5
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.25, 0)
+    corner.Parent = button
+
+    local blurLayer = Instance.new("Frame")
+    blurLayer.Size = UDim2.new(1, 0, 1, 0)
+    blurLayer.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
+    blurLayer.BackgroundTransparency = 0.8
+    blurLayer.ZIndex = button.ZIndex - 1
+    blurLayer.Parent = button
+
+    local cornerBlur = Instance.new("UICorner")
+    cornerBlur.CornerRadius = UDim.new(0.25, 0)
+    cornerBlur.Parent = blurLayer
+
+    button.Parent = parent
+
+    return button
+end
+
+local function animateButton(button)
+    local goal = {BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)}
+    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true)
+    local tween = tweenService:Create(button, tweenInfo, goal)
+    button.MouseButton1Click:Connect(function()
+        tween:Play()
+    end)
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 150, 0, 160)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundTransparency = 1
+frame.Parent = screenGui
+
+local buttonSpacing = 0.25
+local teleportButton = createStyledButton(frame, "Teleport / Back (B/FreezeRunner)", UDim2.new(0, 0, 0 * buttonSpacing, 0))
+
+animateButton(teleportButton)
+
+local initialPosition
+local isTeleported = false
+local lastTeleportedPlayer
+local debounce = false
+
+local function teleportToPlayer(targetPlayer)
+    if not player.Character or not player.Character.PrimaryPart then
+        return
+    end
+
+    if not targetPlayer.Character or not targetPlayer.Character.PrimaryPart then
+        return
+    end
+
+    initialPosition = player.Character.PrimaryPart.Position
+    player.Character:SetPrimaryPartCFrame(targetPlayer.Character.PrimaryPart.CFrame)
+    isTeleported = true
+    teleportButton.Text = "Return to Starting Position"
+    lastTeleportedPlayer = targetPlayer
+end
+
+local function findNextPlayer()
+    local playerRole = player:FindFirstChild("PlayerRole") and player.PlayerRole.Value or nil
+    local eligiblePlayers = {}
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer ~= lastTeleportedPlayer and otherPlayer:FindFirstChild("PlayerRole") then
+            local otherPlayerRole = otherPlayer.PlayerRole.Value
+            if otherPlayerRole ~= "Dead" and ((playerRole == "Runner" and otherPlayerRole == "Frozen") or 
+               (otherPlayerRole == "Crown" or otherPlayerRole == "Runner" or otherPlayerRole == "Survivor" or otherPlayerRole == "Juggernaut" or otherPlayerRole == "B/FreezeRunner" or otherPlayerRole == "B/Crown" or otherPlayerRole == "Alone" or otherPlayerRole == "Frozen") or
+               (playerRole == "RedTeam" and otherPlayerRole == "BlueTeam") or (playerRole == "BlueTeam" and otherPlayerRole == "RedTeam")) then
+                table.insert(eligiblePlayers, otherPlayer)
+            end
+        end
+    end
+
+    if #eligiblePlayers > 0 then
+        local randomIndex = math.random(1, #eligiblePlayers)
+        return eligiblePlayers[randomIndex]
+    else
+        -- Fallback: Teleport to a random player except those with the same role or "Dead"
+        local fallbackPlayers = {}
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer:FindFirstChild("PlayerRole") then
+                local otherPlayerRole = otherPlayer.PlayerRole.Value
+                if otherPlayerRole ~= "Dead" and otherPlayerRole ~= playerRole then
+                    table.insert(fallbackPlayers, otherPlayer)
+                end
+            end
+        end
+        if #fallbackPlayers > 0 then
+            local randomIndex = math.random(1, #fallbackPlayers)
+            return fallbackPlayers[randomIndex]
+        end
+    end
+
+    return nil
+end
+
+local function toggleTeleport()
+    if debounce then return end
+    debounce = true
+
+    if isTeleported then
+        if initialPosition then
+            player.Character:SetPrimaryPartCFrame(CFrame.new(initialPosition))
+            isTeleported = false
+            teleportButton.Text = "Teleport / Back (B/FreezeRunner)"
+        end
+    else
+        local targetPlayer = findNextPlayer()
+        if targetPlayer then
+            teleportToPlayer(targetPlayer)
+        else
+            print("No eligible players to teleport to.")
+            teleportButton.Text = "No eligible players"
+            wait(2)  -- Delay to show message
+            teleportButton.Text = "Teleport / Back (B/FreezeRunner)"
+        end
+    end
+
+    debounce = false
+end
+
+teleportButton.MouseButton1Click:Connect(toggleTeleport)
+
+-- Listen for new players joining
+Players.PlayerAdded:Connect(function(newPlayer)
+    newPlayer.CharacterAdded:Connect(function(character)
+        if newPlayer:FindFirstChild("PlayerRole") and newPlayer.PlayerRole.Value ~= "Dead" then
+            -- Removed call to updateHighlightColors
+        end
+    end)
+end)
+
+-- Periodically update Highlight colors to account for role changes
+runService.Heartbeat:Connect(function()
+    -- Removed call to updateHighlightColors
+end)
