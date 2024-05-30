@@ -1,0 +1,93 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local runService = game:GetService("RunService")
+
+local highlights = {}
+
+local function createOrUpdateHighlight(playerCharacter, color)
+    local highlight = playerCharacter:FindFirstChildOfClass("Highlight")
+
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Adornee = playerCharacter
+        highlight.Parent = playerCharacter
+        table.insert(highlights, {highlight = highlight, character = playerCharacter})
+    end
+
+    if highlight.FillColor ~= color then
+        highlight.FillColor = color
+    end
+end
+
+local function updateHighlights()
+    local localPlayerRole = player:FindFirstChild("PlayerRole") and player.PlayerRole.Value or nil
+
+    if localPlayerRole == "Dead" then
+        -- Remove existing highlights if the local player is dead
+        for _, highlightData in ipairs(highlights) do
+            if highlightData.highlight then
+                highlightData.highlight:Destroy()
+            end
+        end
+        highlights = {}
+        return
+    end
+
+    -- Create new highlights based on roles
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer:FindFirstChild("PlayerRole") then
+            local otherPlayerRole = otherPlayer.PlayerRole.Value
+            if otherPlayerRole ~= "Dead" then
+                local highlightColor
+                if otherPlayerRole == "Crown" then
+                    highlightColor = Color3.new(1, 1, 0)  -- Yellow for Crown
+                elseif otherPlayerRole == "Frozen" then
+                    highlightColor = Color3.new(0, 0, 1)  -- Blue for Frozen
+                else
+                    highlightColor = (localPlayerRole == otherPlayerRole) and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)  -- Green for same role, Red for different role
+                end
+                createOrUpdateHighlight(otherPlayer.Character, highlightColor)
+            end
+        end
+    end
+end
+
+-- Function to monitor PlayerRole value changes
+local function monitorPlayerRole(playerInstance)
+    local playerRole = playerInstance:FindFirstChild("PlayerRole")
+    if playerRole then
+        playerRole:GetPropertyChangedSignal("Value"):Connect(updateHighlights)
+    end
+end
+
+-- Listen for PlayerRole changes for the local player
+monitorPlayerRole(player)
+if player:FindFirstChild("PlayerRole") then
+    player.PlayerRole:GetPropertyChangedSignal("Value"):Connect(updateHighlights)
+end
+
+-- Listen for new players joining
+Players.PlayerAdded:Connect(function(newPlayer)
+    newPlayer.CharacterAdded:Connect(function(character)
+        monitorPlayerRole(newPlayer)
+        updateHighlights()
+    end)
+end)
+
+-- Listen for players leaving to clean up Highlight parts
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+    for index, highlightData in ipairs(highlights) do
+        if highlightData.character == leavingPlayer.Character then
+            if highlightData.highlight then
+                highlightData.highlight:Destroy()
+            end
+            table.remove(highlights, index)
+        end
+    end
+end)
+
+-- Periodically check to update highlights
+runService.Heartbeat:Connect(updateHighlights)
+
+-- Initial setup
+updateHighlights()
