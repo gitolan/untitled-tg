@@ -54,7 +54,7 @@ frame.BackgroundTransparency = 1
 frame.Parent = screenGui
 
 local buttonSpacing = 0.25
-local teleportButton = createStyledButton(frame, "Teleport / Back (B/FreezeRunner)", UDim2.new(0, 0, 0 * buttonSpacing, 0))
+local teleportButton = createStyledButton(frame, "Teleport / Back", UDim2.new(0, 0, 0 * buttonSpacing, 0))
 
 animateButton(teleportButton)
 
