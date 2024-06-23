@@ -161,7 +161,6 @@ local targetPlayer = findNextPlayer()
             wait(2)  -- Delay to show message
             teleportButton.Text = "Teleport / Back"
         end
-    end
 
     debounce = false
 end
