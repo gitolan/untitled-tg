@@ -48,20 +48,30 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 160)
+frame.Size = UDim2.new(0, 150, 0, 240) -- Adjusted height to accommodate new buttons
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundTransparency = 1
 frame.Parent = screenGui
 
 local buttonSpacing = 0.25
 local teleportButton = createStyledButton(frame, "Teleport / Back", UDim2.new(0, 0, 0 * buttonSpacing, 0))
+local teleportAndCreateBlockButton = createStyledButton(frame, "Teleport & Create Blocks", UDim2.new(0, 0, 1 * buttonSpacing, 0))
+local farmCoinButton = createStyledButton(frame, "Start Farm Coin", UDim2.new(0, 0, 2 * buttonSpacing, 0))
+local hitboxButton = createStyledButton(frame, "Start Hitbox", UDim2.new(0, 0, 3 * buttonSpacing, 0))
 
 animateButton(teleportButton)
+animateButton(teleportAndCreateBlockButton)
+animateButton(farmCoinButton)
+animateButton(hitboxButton)
 
 local initialPosition
 local isTeleported = false
 local lastTeleportedPlayer
 local debounce = false
+local farmCoinActive = false
+local hitboxActive = false
+local farmCoinLoop
+local hitboxLoop
 
 local function teleportToPlayer(targetPlayer)
     if not player.Character or not player.Character.PrimaryPart then
@@ -125,7 +135,7 @@ local function toggleTeleport()
         if initialPosition then
             player.Character:SetPrimaryPartCFrame(CFrame.new(initialPosition))
             isTeleported = false
-            teleportButton.Text = "Teleport / Back (B/FreezeRunner)"
+            teleportButton.Text = "Teleport / Back"
         end
     else
         local targetPlayer = findNextPlayer()
@@ -135,25 +145,98 @@ local function toggleTeleport()
             print("No eligible players to teleport to.")
             teleportButton.Text = "No eligible players"
             wait(2)  -- Delay to show message
-            teleportButton.Text = "Teleport / Back (B/FreezeRunner)"
+            teleportButton.Text = "Teleport / Back"
         end
     end
 
     debounce = false
 end
 
-teleportButton.MouseButton1Click:Connect(toggleTeleport)
-
--- Listen for new players joining
-Players.PlayerAdded:Connect(function(newPlayer)
-    newPlayer.CharacterAdded:Connect(function(character)
-        if newPlayer:FindFirstChild("PlayerRole") and newPlayer.PlayerRole.Value ~= "Dead" then
-            -- Removed call to updateHighlightColors
+local targetPlayer = findNextPlayer()
+        if targetPlayer then
+            teleportToPlayer(targetPlayer)
+        else
+            print("No eligible players to teleport to.")
+            teleportButton.Text = "No eligible players"
+            wait(2)  -- Delay to show message
+            teleportButton.Text = "Teleport / Back"
         end
-    end)
-end)
+    end
 
--- Periodically update Highlight colors to account for role changes
-runService.Heartbeat:Connect(function()
-    -- Removed call to updateHighlightColors
-end)
+    debounce = false
+end
+
+local function teleportAndCreateBlock()
+    initialPosition = player.Character.PrimaryPart.Position
+    player.Character:SetPrimaryPartCFrame(CFrame.new(0, 400, 0))
+    isTeleported = true
+    teleportButton.Text = "Return to Starting Position"
+
+    local block = Instance.new("Part")
+    block.Size = Vector3.new(100, 3, 100)
+    block.Position = Vector3.new(0, 397, 0)
+    block.Anchored = true
+    block.Material = Enum.Material.Plastic
+    block.Color = Color3.new(1, 1, 1)
+    block.Transparency = 0.1
+    block.Parent = workspace
+end
+
+local function toggleFarmCoin()
+    farmCoinActive = not farmCoinActive
+    if farmCoinActive then
+        farmCoinButton.Text = "Stop Farm Coin"
+        farmCoinLoop = coroutine.create(function()
+            local targetMeshId = "rbxassetid://8483581926"
+            local function findTargetPart()
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj:IsA("MeshPart") and obj.MeshId == targetMeshId then
+                        return obj
+                    end
+                end
+                return nil
+            end
+
+            while farmCoinActive do
+                local targetPart = findTargetPart()
+                if targetPart then
+                    player.Character:SetPrimaryPartCFrame(targetPart.CFrame)
+                end
+                wait(0.1)
+            end
+        end)
+        coroutine.resume(farmCoinLoop)
+    else
+        farmCoinButton.Text = "Start Farm Coin"
+    end
+end
+
+local function toggleHitbox()
+    hitboxActive = not hitboxActive
+    if hitboxActive then
+        hitboxButton.Text = "Stop Hitbox"
+        hitboxLoop = runService.Stepped:Connect(function()
+            if hitboxActive then
+                for _, i in next, Players:GetPlayers() do
+                    if i ~= player then
+                        local root = i.Character and i.Character:FindFirstChild("HumanoidRootPart")
+                        if root then
+                            root.Size = Vector3.new(7, 7, 6)
+                            root.Transparency = 0.5
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        hitboxButton.Text = "Start Hitbox"
+        if hitboxLoop then
+            hitboxLoop:Disconnect()
+        end
+    end
+end
+
+teleportButton.MouseButton1Click:Connect(toggleTeleport)
+teleportAndCreateBlockButton.MouseButton1Click:Connect(teleportAndCreateBlock)
+farmCoinButton.MouseButton1Click:Connect(toggleFarmCoin)
+hitboxButton.MouseButton1Click:Connect(toggleHitbox)
