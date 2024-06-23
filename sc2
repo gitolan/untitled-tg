@@ -50,11 +50,11 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
-local frameZIndex = 1000
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 150, 0, 240) -- Adjusted height to accommodate new buttons
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundTransparency = 1
+frame.ZIndex = 100
 frame.Parent = screenGui
 
 local buttonSpacing = 0.25
